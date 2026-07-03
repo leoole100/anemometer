@@ -10,7 +10,7 @@
   │  Analog front end                               │
   │   TX: boost (10–30 V, fw-adjustable) + H-bridge │
   │   RX: mux → clamp → fixed gain → PGA → AA → ADC │
-  │        ↓ SPI DMA (~2 MSPS)                      │
+  │        ↓ parallel DVP capture (4 MSPS, DMA)     │
   │  ESP32-S3  ── I2C ──  IMU + compass, SHT41      │
   │   correlation,     ── UART ── GPS (optional)    │
   │   Signal K deltas  ── PWM ──  all-round LED     │

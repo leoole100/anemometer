@@ -22,10 +22,17 @@ f0 = 40 ± 1 kHz. Check on the candidate datasheets:
 | Capacitance | note it (~2–3 nF), sets drive current |
 | Environment | sealed face, −20…+60 °C |
 
-Candidates to compare: Prowave 400EP14D / 400EP18A, Murata parking-sensor
-series (MA40MF14 class), Manorshi 16 mm sealed. **Buy from two vendors** —
-sample variation is the project's biggest unknown; the gain chain is sized to
-absorb it.
+Selected candidates (July 2026 research):
+
+- **Primary: Multicomp MCUSD16A40S12RO** (Farnell 2362677) — sealed 16 mm
+  metal-can transceiver, 40 kHz, −65 dB sensitivity, −30…+85 °C. European
+  distribution, real datasheet.
+- **Second vendor: TCT40-16 sealed / Taidacent 16 mm waterproof transceiver**
+  (generic parking-sensor class, ≥106–117 dB SPL @ 10 V/30 cm across vendors —
+  consistent with the 105 dB link-budget assumption).
+
+**Buy from two vendors** — sample variation is the project's biggest unknown;
+the gain chain is sized to absorb it.
 
 ## Geometry: down-facing bounce path
 
@@ -85,10 +92,17 @@ digitally set. Uncertainty band is wide on purpose; that's the point.
 
 - Boost converter 5 V → **Vb = 10–30 V, firmware-adjustable** (PWM/DAC into
   feedback node). Load is trivial: |Z| of 2.5 nF at 40 kHz ≈ 1.6 kΩ.
-- Each transducer has one terminal grounded, hot terminal driven single-ended
-  by a half-bridge with **true Hi-Z (coast) mode** — candidate DRV8876 class
-  (2 half-bridges per chip → 2 chips total). During a transducer's RX slot its
-  bridge coasts and the element floats free.
+- **One DRV8876 per transducer (4 chips), PWM mode (PMODE = low)**, transducer
+  single-ended on OUT1 (other terminal grounded). Drive = alternate
+  IN1/IN2 = (1,0)/(0,1); receive = coast IN1=IN2=0, both outputs true Hi-Z,
+  element floats free. Verified: coast without sleep exists in PWM mode; the
+  independent half-bridge mode (PMODE = Hi-Z) does NOT clearly offer per-output
+  Hi-Z, which is why it's one full chip per transducer. Bridge-tying OUT1/OUT2
+  for double drive stays available as a fallback if the link budget
+  disappoints (needs differential RX pick-off — only if forced).
+- Remaining low-risk check at schematic time: DRV8876 off-state leakage and
+  output capacitance loading the floating element (series 10 k + the
+  transducer's own 2.5 nF dominate; expect negligible).
 - Burst: 8–16 cycles at 40 kHz from MCPWM/RMT; optional anti-phase tail for
   active ring-down damping.
 - **TX marker**: ~100:1 divider from one driver output into a spare mux input —
@@ -97,10 +111,12 @@ digitally set. Uncertainty band is wide on purpose; that's the point.
 
 ### RX
 
-signal path: transducer → 10 k series + BAV99 clamp → 8:1 mux (74HC4051:
-4 transducers, TX marker, GND ref, spares) → AC couple → fixed stage G=10 with
-bandpass (HP ~15 kHz, LP ~120 kHz, MFB) → PGA MCP6S91 (G=1–32, SPI) →
-switchable +20 dB stage (analog-switch bypass) → ADC.
+signal path: transducer → 10 k series + BAV99 clamp → 8:1 mux (TMUX1108,
+better leakage/Ron than 74HC4051: 4 transducers, TX marker, GND ref, spares)
+→ AC couple → fixed stage G=10 with bandpass (HP ~15 kHz, LP ~120 kHz, MFB)
+→ PGA MCP6S91 (G=1–32, SPI; bandwidth 1–18 MHz, still ≥1 MHz at G=32 —
+verified, fine for 40 kHz) → switchable +20 dB stage (analog-switch bypass)
+→ ADC driver → ADC.
 
 - Analog rail 3.3 V, mid-bias 1.65 V (direct SPI to ESP32, no level shift).
 - Total gain 20–70 dB in fine digital steps.
@@ -109,10 +125,26 @@ switchable +20 dB stage (analog-switch bypass) → ADC.
 
 ### ADC + capture
 
-- ADS7883 class: 12-bit, 3 MSPS, SPI. Run at **2 MSPS** (SCLK 32 MHz,
-  16 clk/sample) via ESP32-S3 SPI DMA.
-- Capture window 1.2 ms = 2400 samples (4.8 KB), starting ~50 µs before TX.
-- Fallback: 1 MSPS changes nothing fundamental (interpolation unaffected).
+**Design change from first draft.** A per-conversion CS-framed SPI ADC
+(ADS7883 class) cannot be clocked gap-free by the S3's SPI master DMA — each
+16-clock frame needs a CS edge the DMA stream can't generate, and per-
+transaction software overhead kills 2 MSPS. Instead:
+
+- **Parallel pipeline ADC captured by the ESP32-S3 LCD_CAM camera (DVP)
+  peripheral** — fully hardware-clocked DMA capture, no CPU in the loop.
+  Prior art: S3-based oscilloscope/logic-analyzer projects use exactly this
+  peripheral for continuous parallel capture.
+- ADC: AD9235-20 class (12-bit pipeline, 1–20 MSPS, ~90 mW at 3 V).
+  Run at **4 MSPS** — clock from LEDC/MCPWM, wired to both ADC CLK and CAM
+  PCLK so converter and capture share one clock. (Known-cheap alternative
+  with community track record: AD9226 module, but 5 V / ~475 mW.)
+- Pipeline latency (7 clocks) is a constant offset; the TX marker calibrates
+  it out anyway.
+- Capture window 1.2 ms = 4800 samples (9.6 KB), starting ~50 µs before TX.
+- Pin cost: 12 data + PCLK ≈ 13 GPIOs. Budget sketch across all functions
+  lands ~33 of the module's ~36 usable pins — feasible, but pin mapping is a
+  first-class layout task, and a WROOM-1 variant without octal PSRAM is
+  required (octal claims GPIO 35–37).
 
 ## Measurement cycle
 
@@ -143,14 +175,23 @@ switchable +20 dB stage (analog-switch bypass) → ADC.
 Compute: ~2400-sample complex correlation over ±130 lags ≈ ms-scale on the
 S3 with 16-bit fixed point — fits the slot budget with decimation to spare.
 
-## Verify before schematic freeze
+## Verify list — resolved 2026-07-03
 
-- [ ] DRV8876 (or chosen driver) supports independent half-bridge control and
-      true Hi-Z per output; check coast-mode leakage/capacitance loading on RX.
-- [ ] ESP32-S3 SPI master DMA: sustained 32 MHz clocking for 2400-sample
-      transactions (else drop to 1 MSPS).
-- [ ] Candidate transducer datasheets against the requirements table; pick two.
-- [ ] MCP6S91 bandwidth at G=32 comfortably covers 40 kHz (spec ~1 MHz — yes,
-      but confirm on datasheet rev).
-- [ ] 74HC4051 on-resistance/injection acceptable at 40 kHz mV-level signals
-      (else TMUX1108).
+- [x] Driver Hi-Z: DRV8876 coast (both outputs Hi-Z, no sleep) confirmed in
+      PWM mode; per-output Hi-Z in independent half-bridge mode NOT confirmed
+      → design changed to one chip per transducer, PWM mode. Residual check at
+      schematic time: off-state leakage/output capacitance (low risk).
+- [x] S3 capture: SPI-ADC-per-sample-CS ruled out; switched to parallel ADC
+      (AD9235-20 class) on the LCD_CAM DVP peripheral at 4 MSPS. DMA length
+      is limited only by internal memory — 9.6 KB windows are trivial.
+- [x] Transducers: Multicomp MCUSD16A40S12RO primary + TCT40-16-class generic
+      as second vendor; specs consistent with link budget.
+- [x] MCP6S91: 1–18 MHz bandwidth, ≥~1 MHz worst case at G=32 — fine at 40 kHz.
+- [x] Mux: TMUX1108 selected over 74HC4051 (leakage/Ron/injection).
+
+## Open items for schematic phase
+
+- [ ] Full GPIO map (≈33 pins needed; WROOM-1 without octal PSRAM).
+- [ ] DRV8876 off-state loading on the floating transducer.
+- [ ] AD9235 input driving stage (last op-amp → ADC input range/CM level).
+- [ ] Boost converter part selection and adjustable-feedback network.
