@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "kicad": {
+      "command": "node",
+      "args": ["/home/leon/tools/KiCAD-MCP-Server/dist/index.js"],
+      "env": {
+        "NODE_ENV": "production",
+        "PYTHONPATH": "/usr/lib/python3/dist-packages",
+        "LOG_LEVEL": "info",
+        "KICAD_AUTO_LAUNCH": "false"
+      }
+    }
+  }
+}
