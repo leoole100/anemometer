@@ -23,6 +23,7 @@ ranges, adjustable TX drive, stage-isolation links, test points, OTA from day on
 - [docs/power-design.md](docs/power-design.md) — power tree, protection, budget, LED light sizing
 - [docs/digital-design.md](docs/digital-design.md) — MCU circuit, strapping, DVP clocking, buses, firmware platform
 - [docs/pinmap-parts.md](docs/pinmap-parts.md) — GPIO map and part selection
+- [docs/enclosure-design.md](docs/enclosure-design.md) — acoustic geometry in plastic, environment, GPS/LED placement
 - [docs/design-review-2026-07-04.md](docs/design-review-2026-07-04.md) — full-numbers design review, findings F1–F4
 
 ## Status (July 2026)

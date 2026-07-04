@@ -91,5 +91,7 @@ All resistor/capacitor values: see [afe-design.md](afe-design.md).
       lux meter (≥ 0.35 lx at 3 m).
 - [x] DVP VSYNC (resolved 2026-07-04 → digital-design.md): plan A is an
       MCU-driven GPIO12 frame pulse, PCB pin-to-pin; pin reserved.
-- [ ] GPS patch antenna vs. LED ring placement conflict at the top — resolve
-      in enclosure design.
+- [x] GPS patch antenna vs. LED ring placement (resolved 2026-07-04 →
+      enclosure-design.md): shared top disc under the diffuser dome — LEDs
+      at the perimeter firing outward, GPS centered patch-up; no horizontal
+      shadow, GPS looks through ~2 mm diffuser plastic.
