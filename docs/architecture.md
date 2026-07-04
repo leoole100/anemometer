@@ -43,7 +43,8 @@ Consequences:
 
 ### Time-of-flight by waveform correlation
 
-Full received waveform sampled at ~2 MSPS, cross-correlated in firmware.
+Full received waveform sampled at 4 MSPS (processed at 2 MSPS after the
+baseband mix), cross-correlated in firmware.
 Envelope for the coarse peak (cycle-slip protection), carrier
 phase/interpolation for fine timing. Reciprocal (up/down) measurement makes
 wind independent of sound speed; the ToF **sum** yields sound speed →
@@ -77,8 +78,8 @@ air temperature for free (cross-checked against SHT41).
 
 ## De-risking rules for the one-spin board
 
-1. ~60 dB total gain authority, digitally set (transducer sensitivity is the
-   biggest unknown).
+1. 50 dB of total gain authority (20–70 dB), digitally set (transducer
+   sensitivity is the biggest unknown).
 2. TX drive voltage firmware-adjustable 10–30 V.
 3. 0-ohm links between every analog stage; test points on every node.
 4. Stuffing options for filter RCs; transducers bought from two vendors.

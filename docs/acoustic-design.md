@@ -17,7 +17,7 @@ f0 = 40 ± 1 kHz. Check on the candidate datasheets:
 | Parameter | Requirement |
 |---|---|
 | SPL @ 10 Vrms, 30 cm | ≥ 103 dB |
-| RX sensitivity | ≥ −90 dB re 1 V/Pa (≥ ~0.3 mV/Pa) |
+| RX sensitivity | ≥ −70 dB re 1 V/Pa (≥ ~0.3 mV/Pa) (was mistyped −90 dB; fixed 2026-07-04, review F4) |
 | Beamwidth (−6 dB) | ≥ 70° |
 | Capacitance | note it (~2–3 nF), sets drive current |
 | Environment | sealed face, −20…+60 °C |
@@ -66,7 +66,8 @@ Wind formulas (per axis, t_f/t_r = forward/reverse ToF):
     v = (P² / 2D) · (1/t_f − 1/t_r)        (independent of c)
     c = (P / 2)  · (1/t_f + 1/t_r)         (→ air temperature: T[K] = (c/20.05)²)
 
-At 30 m/s: Δt = 51 µs → correlation search window ±120 samples @ 2 MSPS.
+At 30 m/s: Δt = 51 µs → correlation search window ±120 samples at the
+2 MSPS post-decimation processing rate (capture itself is 4 MSPS).
 Beam drift at 30 m/s: v/c · P ≈ 11 mm lateral — well inside a 70° beam.
 
 ## Link budget
@@ -163,7 +164,8 @@ transaction software overhead kills 2 MSPS. Instead:
 ## Correlation algorithm (firmware)
 
 1. Find TX marker → t0 on the capture's own clock.
-2. Quadrature mix to baseband (40 kHz I/Q, LPF) → complex envelope.
+2. Quadrature mix to baseband (40 kHz I/Q, LPF, decimate 4 MSPS → 2 MSPS)
+   → complex envelope. All sample counts below are at the 2 MSPS rate.
 3. Coarse ToF: envelope correlation against a template (template = averaged
    real echoes, captured at first power-up; self-calibrating).
 4. Fine ToF: carrier phase of the complex correlation at the coarse peak.

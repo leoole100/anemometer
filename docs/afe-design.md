@@ -10,7 +10,7 @@ the end covers datasheet numbers assumed from memory (none change topology).
 ```
 xdcr ──┬── 10k ──┬─ BAV99 ↕ (3.3VA/GND) ── 1k ── TMUX1108 (CH0–3)
        │         │                                    │COM
-      100k      (clamp node)                         10n
+      100k      (clamp node)                          1n
        │                                              │
       GND                             node B ─────────┤
                                       100k → VMID ────┤
@@ -25,7 +25,7 @@ xdcr ──┬── 10k ──┬─ BAV99 ↕ (3.3VA/GND) ── 1k ── TMU
 | Input protection | 10 k series, BAV99 to 3.3VA/GND, then 1 k into mux | clamp current 2.7 mA during own-channel TX; 1 k limits injection into mux above its rail |
 | Bleed | 100 k node → GND (×4) | DC path for driver Hi-Z leakage (see below) |
 | Mux | TMUX1108, EN from SR | CH0–3 xdcr, CH4 marker cal tap, CH5 GND ref, CH6–7 spare→GND |
-| AC couple + bias | 10 nF, 100 k → VMID | HP 159 Hz; node B impedance ≈ 11.5 k at 40 kHz |
+| AC couple + bias | **1 nF** (was 10 nF, review F1), 100 k → VMID | HP 1.4 kHz; mux-switch DC-step settling τ ≈ 110 µs; node B ≈ 12 k at 40 kHz; −1 dB series loss at 40 kHz |
 | A1 fixed gain | Rf 9.1 k ∥ 150 pF; Rg 1 k + 15 nF series → VMID | G = 10.1 (20 dB); LP 117 kHz; HP shelf ~11 kHz (gain→1 below, not 0 — AC couple kills DC) |
 | PGA | MCP6S91, VREF pin → VMID, CS GPIO37 | 0–30 dB in 1/2/4/5/8/10/16/32 steps |
 | A2 switched gain | Rf 9.1 k; Rg 1 k + TMUX1101 → VMID; SR bit GAIN_SW | open → G=1, closed → G=10.1 (+20 dB); switch sits at VMID, Ron ≪ Rg |
@@ -39,11 +39,18 @@ Op-amps: **2× OPA2365 dual** (A1+A2, A3+A4). 3.3VA rail throughout.
   22–46 dB (2–30 mV echo → 0.4 V amplitude at ADC, 80 % of FS).
 - Anti-alias at 3.96 MHz (aliases onto 40 kHz at 4 MSPS): SK ≈ 56 dB +
   A1 first-order ≈ 30 dB → > 80 dB. ✔
-- Noise: ≈ 19 nV/√Hz input-referred (11.5 k node + 10 k series + amp) →
+- Noise: ≈ 19 nV/√Hz input-referred (~12 k node + 10 k series + amp) →
   ≈ 8 µV rms in ~170 kHz ENBW → **SNR ≈ 45 dB at the 2 mV worst-case echo**,
   better than the 25–35 dB assumed in the timing budget.
 - A1 gain droop at 40 kHz from the HP shelf: −0.3 dB — identical both
   directions, cancels in reciprocal Δt.
+- **Coupling cap changed 10 nF → 1 nF (2026-07-04, design-review F1):**
+  mux channels sit at different DC levels (bleed × leakage, GND ref), and
+  the old 159 Hz corner settled with τ ≈ 1.1 ms ≈ one slot — the DC-coupled
+  PGA (×32) and A2 (×10) could clip at high gain for most of the capture.
+  At 1.4 kHz corner the step dies in ~350 µs. Firmware rule: **pre-switch
+  the mux to the next RX channel immediately after each capture ends.**
+  Phase at 40 kHz (2°) and the −1 dB loss are direction-symmetric.
 
 ## TX marker — design change
 
@@ -54,7 +61,7 @@ swings ≈ 0.39 × 30 V ≈ 12 V. Through a 1 M injection that is ~130 mV at the
 summing node = **5–60× the echo**. Unusable.
 
 **New scheme: logic-side injection.** PWM_A (GPIO21, 3.3 Vpp) → **3.3 MΩ**
-into node B → ≈ 11 mVpp, mid-echo scale. After the burst PWM_A is driven low
+into node B → ≈ 12 mVpp, mid-echo scale. After the burst PWM_A is driven low
 (push-pull MCU pin): dead silent during the echo window. Jitter cancellation
 is preserved — PWM and capture run on the same chip clock, which is the jitter
 being killed; driver + transducer group delay is constant and cancels exactly
@@ -72,7 +79,7 @@ in the reciprocal Δt.
 |---|---|
 | PMODE | GND (PWM mode; coast = Hi-Z verified earlier) |
 | IN1 / IN2 | AND(PWM_A, DRV_ENn) / AND(PWM_B, DRV_ENn) — 2× 74AHC08 |
-| nSLEEP | common SR bit, 100 k pulldown |
+| nSLEEP | **per-driver SR bits DRV_nSLP0–3** (review F2), 100 k pulldown each |
 | nFAULT | common 10 k pullup → **test point only** (no clean GPIO: pullup on 46 blocks download-mode entry, on 45 straps VDD_SPI) |
 | VREF | 3.3 V |
 | IPROPI | 2.4 k → GND → ILIM ≈ 3 A (never engages in normal drive) |
@@ -85,9 +92,16 @@ in the reciprocal Δt.
 ~400 pF (2× FET Coss) against C0 ≈ 2.4 nF → capacitive divider 0.86 =
 **−1.3 dB**, absorbed by gain authority. Low risk confirmed.
 
-**Sleep duty-cycling:** 4 drivers awake continuously ≈ 20 mA at Vb ≈ 0.6 W —
-too much for the 2–3 W budget. Wake all four for the ~6 ms measurement
-sequence, sleep between → ~20 mW average. tWAKE ~1 ms fits the 5 Hz cycle.
+**Sleep duty-cycling (corrected 2026-07-04, review F2):** 4 drivers awake
+continuously ≈ 20 mA at Vb ≈ 0.6 W — too much for the 2–3 W budget. The
+first draft claimed "wake all four for a ~6 ms sequence → 20 mW", but the
+measurement occupies 4 × 32 × 1.5 ms = 192 ms of every 200 ms frame (96 %),
+so waking all four while measuring saves nothing. Instead: **per-driver
+nSLEEP**, pings grouped per direction (32 × N→S, then 32 × S→N, …), only the
+transmitting driver awake — the RX-side driver is Hi-Z in sleep exactly as in
+coast. Each driver wakes ~1 ms (tWAKE) before its 48 ms block →
+≈ 5 mA · Vb · 96 % ≈ **70–150 mW average**. Grouping keeps both directions of
+an axis within ~50 ms — inside gust time scales, reciprocity intact.
 
 ## Boost 10–30 V (TPS61170, resolved)
 
@@ -136,12 +150,12 @@ for a 3.3 V RRIO driver.
 2× **74AHC595** (AHC for 3.3 V speed margin), SPI shared with PGA
 (MOSI 36 / SCK 35), RCLK GPIO38, /SRCLR → 3.3 V,
 **/OE → GPIO3 with 10 k pullup** → outputs Hi-Z at boot; 100 k pulldowns
-define safe state on DRV_EN0–3, DRV_nSLEEP, BOOST_EN, MUX_EN.
+define safe state on DRV_EN0–3, DRV_nSLP0–3, BOOST_EN, MUX_EN.
 GPIO3 was a spare; spares are now 0, 45, 46.
 
 | U1 bits | U2 bits |
 |---|---|
-| DRV_EN0–3, DRV_nSLEEP, BOOST_EN, GAIN_SW, spare | MUX A0–A2, MUX_EN, 4× spare/TP |
+| DRV_EN0–3, DRV_nSLP0–3 | BOOST_EN, GAIN_SW, MUX A0–A2, MUX_EN, 2× spare/TP |
 
 ## Verify at schematic capture (datasheet PDF in hand)
 
@@ -153,3 +167,14 @@ Numbers assumed from memory; none change topology, only resistor tweaks:
 4. TPS61170 max duty at 1.2 MHz allows 30 V from 5 V (D ≈ 0.84).
 5. MCP6S91 VREF pin range and output swing at 3.3 V supply, G = 32.
 6. OPA2365 overdrive recovery from marker clipping (expect < 1 µs).
+
+Added by the 2026-07-04 design review:
+
+7. Cross-rail sequencing: TMUX1108 select/EN, MCP6S91 SPI and AD9235 CLK are
+   driven from 3.3D while the parts sit on 3.3VA (LDO, rises later) — confirm
+   each part tolerates V_logic > V_supply during ramp (TMUX11xx claims logic
+   levels independent of supply).
+8. DRV8876 ITRIP/current-regulation deglitch time ≫ the ~ns capacitive edge
+   spikes of the 2.5 nF load, so the 3 A ITRIP can never chop a burst edge.
+9. AD9235 minimum conversion rate (datasheet min 1 MSPS; running 4 MSPS) and
+   duty-cycle-stabilizer behavior at 4 MHz.

@@ -19,9 +19,18 @@ ranges, adjustable TX drive, stage-isolation links, test points, OTA from day on
 
 - [docs/architecture.md](docs/architecture.md) — system architecture and rationale
 - [docs/acoustic-design.md](docs/acoustic-design.md) — transducers, geometry, link budget, front end
+- [docs/afe-design.md](docs/afe-design.md) — AFE schematic values + verify-at-capture list
+- [docs/power-design.md](docs/power-design.md) — power tree, protection, budget, LED light sizing
+- [docs/digital-design.md](docs/digital-design.md) — MCU circuit, strapping, DVP clocking, buses, firmware platform
+- [docs/pinmap-parts.md](docs/pinmap-parts.md) — GPIO map and part selection
+- [docs/design-review-2026-07-04.md](docs/design-review-2026-07-04.md) — full-numbers design review, findings F1–F4
 
 ## Status (July 2026)
 
-Concept and architecture fixed. AFE fully valued (docs/afe-design.md,
-2026-07-04). Next: schematic capture in KiCad (verify-at-capture list in
-afe-design.md), then power/digital, then layout.
+Concept and architecture fixed. AFE fully valued (docs/afe-design.md).
+Design review passed 2026-07-04 with four findings, all fixed on paper:
+RX coupling settling (10 nF → 1 nF), per-driver TX sleep (power claim was
+~25× off), LED string topology + quantified legal intensity (1S6P, ≥ 3 cd),
+sensitivity-spec typo. Power tree and digital/MCU design now valued
+(power-design.md, digital-design.md). Next: schematic capture in KiCad
+(verify-at-capture list in afe-design.md), then layout.
