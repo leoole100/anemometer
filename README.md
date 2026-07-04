@@ -22,5 +22,6 @@ ranges, adjustable TX drive, stage-isolation links, test points, OTA from day on
 
 ## Status (July 2026)
 
-Concept and architecture fixed. Acoustic chain design in progress.
-Next: front-end schematic capture, then power/digital, then layout.
+Concept and architecture fixed. AFE fully valued (docs/afe-design.md,
+2026-07-04). Next: schematic capture in KiCad (verify-at-capture list in
+afe-design.md), then power/digital, then layout.

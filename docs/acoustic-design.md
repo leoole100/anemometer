@@ -105,9 +105,14 @@ digitally set. Uncertainty band is wide on purpose; that's the point.
   transducer's own 2.5 nF dominate; expect negligible).
 - Burst: 8–16 cycles at 40 kHz from MCPWM/RMT; optional anti-phase tail for
   active ring-down damping.
-- **TX marker**: ~100:1 divider from one driver output into a spare mux input —
-  puts t=0 into every capture buffer (kills trigger jitter, calibrates out
-  group delays).
+- **TX marker** (revised 2026-07-04, see afe-design.md): injected from the
+  **logic-side PWM_A** signal via 3.3 M into the post-mux summing node —
+  puts t=0 into every capture buffer (kills trigger jitter). The original
+  power-side divider was rejected: permanently connected, it couples the TX
+  transducer's ring-down (τ ≈ 0.4 ms) into the RX path at 5–60× echo level
+  at echo-arrival time. PWM_A idles driven-low → silent during the echo
+  window. A 100 k tap from PWM_A to a spare mux input is kept for group-delay
+  calibration captures.
 
 ### RX
 
@@ -189,9 +194,12 @@ S3 with 16-bit fixed point — fits the slot budget with decimation to spare.
 - [x] MCP6S91: 1–18 MHz bandwidth, ≥~1 MHz worst case at G=32 — fine at 40 kHz.
 - [x] Mux: TMUX1108 selected over 74HC4051 (leakage/Ron/injection).
 
-## Open items for schematic phase
+## Open items for schematic phase — resolved 2026-07-04
 
-- [ ] Full GPIO map (≈33 pins needed; WROOM-1 without octal PSRAM).
-- [ ] DRV8876 off-state loading on the floating transducer.
-- [ ] AD9235 input driving stage (last op-amp → ADC input range/CM level).
-- [ ] Boost converter part selection and adjustable-feedback network.
+- [x] Full GPIO map → pinmap-parts.md.
+- [x] DRV8876 off-state loading → afe-design.md: −1.3 dB capacitive divider,
+      100 k bleed added per transducer. Low risk confirmed.
+- [x] AD9235 input driving stage → afe-design.md: single-ended, 1 Vpp span
+      (SENSE=AVDD), Sallen-Key 155 kHz driver, VIN− tied to VMID.
+- [x] Boost network → afe-design.md: TPS61170, 120 k/6.8 k/18 k injection,
+      Vb = 10.5–30.3 V from LEDC PWM (inverse relation, EN-gated at boot).

@@ -27,11 +27,17 @@ GPIO 35–37, and the correlation buffers are small enough for internal RAM).
 | Boost Vb adjust (LEDC PWM) | 48 | filtered into TPS61170 FB node |
 | USB D− / D+ | 19, 20 | flashing/debug fallback |
 | UART0 TX / RX (console) | 43, 44 | debug header |
-| Spare / button / test | 0, 3, 45, 46 | strapping-tolerant uses only |
+| Shift-register /OE | 3 | 10 k pullup → outputs Hi-Z at boot (safe-state pulldowns on critical nets) |
+| Spare / button / test | 0, 45, 46 | strapping-tolerant uses only |
 
-**Shift-register outputs (16):** DRV_EN0–3 (PWM gating), MUX A0–A2, GAIN_SW,
-BOOST_EN, TX-marker enable, spares. Static between measurement slots, so
-latency doesn't matter — this is what frees ~8 direct GPIOs.
+**Shift-register outputs (16):** U1: DRV_EN0–3 (PWM gating), DRV_nSLEEP
+(common — drivers sleep between measurement sequences, ~0.6 W → ~20 mW),
+BOOST_EN, GAIN_SW, spare. U2: MUX A0–A2, MUX_EN, 4× spare/TP. Static between
+measurement slots, so latency doesn't matter — this is what frees ~8 direct
+GPIOs. 74AHC595 ×2; /OE from GPIO3 (pullup) + 100 k pulldowns on DRV_EN,
+DRV_nSLEEP, BOOST_EN, MUX_EN give a defined safe state at boot. The TX-marker
+enable bit is gone — the marker is now always-on logic-side injection (see
+afe-design.md).
 
 **PWM gating:** PWM_A/B are bused to all four DRV8876s through dual AND gates
 per driver (2× 74HC08); DRV_ENn selects which transducer fires. Non-selected
@@ -46,9 +52,14 @@ drivers see IN1=IN2=0 = coast (Hi-Z).
 | Transducers ×4 | Multicomp MCUSD16A40S12RO (+ TCT40-16-class 2nd vendor) |
 | TX driver ×4 | DRV8876 (PWM mode, coast = Hi-Z) |
 | RX mux | TMUX1108 |
-| Fixed gain + bandpass | OPA2365-class RRIO op-amps |
+| Op-amps A1–A4 | OPA2365 ×2 (duals): fixed gain, +20 dB stage, AA/ADC driver, VMID buffer |
+| Gain-switch | TMUX1101 (bypasses A2 gain leg) |
 | PGA | MCP6S91 |
 | ADC | AD9235BRUZ-20 (12-bit parallel pipeline, run at 4 MSPS) |
+| Logic | 74AHC595 ×2 (control SR), 74AHC08 ×2 (PWM gating) |
+| Clamps | BAV99 ×5 |
+
+All resistor/capacitor values: see [afe-design.md](afe-design.md).
 
 ### Power
 
