@@ -1,129 +1,79 @@
-# Power design — 2026-07-04
+# Power design — updated 2026-07-04
 
-Deck-to-masthead power chain, all rails valued for schematic capture.
-Companion to afe-design.md (AFE rails already fixed there: 3.3VA LDO,
-TX boost TPS61170).
+Deck-to-masthead power chain, all rails valued for schematic capture. Companion to afe-design.md (AFE rails fixed there: 3.3VA LDO, 5–19 V wide-range direct drive).
 
 ## Topology
 
 ```
-USB-C bank ── CH224K trigger ──╮ DECK BOX
-                12 V (9/5 V fallback)
-                               │  2-wire, ~7 m up the mast
-MASTHEAD ──────────────────────┴───────────────────────────────
- entry: polyfuse 0.5 A ── SS34 reverse ── SMAJ15A TVS ── bulk 100 µF
-   │
-   ├── AP63205 buck → 5 V ──┬── TPS7A20 LDO → 3.3VA (AFE + ADC)
-   │                        └── TPS61170 boost → Vb 10–30 V (TX)
-   ├── AP63203 buck → 3.3D (ESP32, logic, sensors, GPS)
-   └── AL8860 buck → LED ring (1S6P, 180 mA full scale)
+Input (USB-C or 12 V Network) ───────────────────────────────────╮ DECK BOX
+                  5 V to 19 V (Variable Input)
+                                                                 │  2-wire, ~7 m up the mast
+MASTHEAD ────────────────────────────────────────────────────────┴
+ entry: polyfuse 0.5 A ── SS34 reverse ── SMAJ15A TVS ── bulk 100 µF ──┬── V_INPUT (5–19 V) (IXDF602, DG412, AL8860)
+                                                                       ├── AP63203 buck → 3.3D (ESP32, logic, sensors, ADC digital)
+                                                                       └── HT7333 LDO → 3.3VA (AFE, ADC analog)
 ```
 
-Rationale for the split: everything analog hangs off the quiet 5 V
-intermediate rail through an LDO; everything that switches hard (radio,
-LED PWM) lives on its own buck straight from the input. The LED driver
-takes raw input, not 5 V, so its current never modulates the 5 V rail
-feeding the AFE.
+Rationale: The design is highly resilient to input voltage swings. By powering the gate driver ($IXDF602$), selector switch ($DG412$), and LED driver ($AL8860$) directly from the raw input `V_INPUT` (which can vary between 5 V and 19 V depending on whether it is fed by a 5 V USB line, a PD trigger bank, or a boat battery), we completely eliminate the boost converter. A single buck regulator generates the 3.3 V logic rail, and a low-cost LDO generates the quiet analog rail.
+
+---
 
 ## Input stage (mast cable entry)
 
 | Item | Part / value | Notes |
 |---|---|---|
-| Fuse | PTC polyfuse, 0.5 A hold / 1 A trip, ≥ 30 V | peaks ~250 mA |
-| Reverse polarity | SS34 series Schottky | 0.3 V · 0.2 A ≈ 60 mW loss — accepted for simplicity; PFET footprint not worth it at this current |
-| Surge/ESD | SMAJ15A TVS (15 V standoff, clamps ~24 V) | all downstream parts ≥ 32 V rated |
-| Bulk | 100 µF electrolytic + 10 µF X7R | cable inductance + PD hot-plug |
-| USB bench feed | SS34 from USB-C VBUS into the node after the input SS34 | board runs from the laptop alone ≙ the 5 V PD fallback case; diodes isolate the two sources |
+| **Fuse** | PTC polyfuse, 0.5 A hold / 1 A trip, ≥ 30 V | Peak currents ~200 mA at 5 V; lower at 19 V. |
+| **Reverse polarity** | SS34 series Schottky | 0.3 V drop. |
+| **Surge/ESD** | SMAJ15A TVS (15 V standoff, clamps ~24 V) | All downstream parts ≥ 30 V rated. |
+| **Bulk** | 100 µF electrolytic + 10 µF X7R | Cable inductance + hot-plug. |
 
-Cable: 2×0.5 mm² (AWG20) ≈ 0.46 Ω for 14 m loop → 0.1 V drop at peak load.
-Even AWG24 (1.2 Ω, 0.3 V) works; specify 0.5 mm² for abrasion margin, not
-resistance.
+---
 
 ## Rails and loads
 
 | Rail | Source | Loads | Current | Notes |
 |---|---|---|---|---|
-| 5 V | AP63205 (3.8–32 Vin, 2 A) | TPS7A20 in, TPS61170 in | ~60 mA avg | L 10 µH, Cout 2×22 µF per DS |
-| 3.3D | AP63203 (2 A) | ESP32-S3, SRs/gates, sensors, GPS | 160 mA avg, 550 mA pk (WiFi) | L 10 µH, Cout 2×22 µF |
-| 3.3VA | TPS7A20 (300 mA) | op-amps 19 mA, PGA 1 mA, AD9235 ~30 mA, mux | ~55 mA | low-noise, PSRR kills buck ripple |
-| Vb 10–30 V | TPS61170 | DRV8876 VM ×4 | 5 mA awake + 3 mA burst avg | see afe-design.md |
-| LED | AL8860 | 6× LED 1S6P | 0–180 mA at ~3.1 V | see below |
+| **V_INPUT** | Protected Input | IXDF602 V+, DG412 V+, AL8860 input, AP63203 input, HT7333 input | 35–150 mA | Derived from USB-C power bank or boat battery (5–19 V). |
+| **3.3D** | AP63203 (2 A buck) | ESP32-S3, SMT sensors (IMU, Mag), PCM1808 digital core | 120 mA avg, 450 mA pk | L 10 µH, Cout 2×22 µF. Operates down to Vin = 3.8 V. |
+| **3.3VA** | HT7333-A (150 mA LDO) | Op-amp 1.5 mA, PCM1808 analog domain ~10 mA | ~12 mA | Low-noise, SOT-89 package. Operates down to Vin = 3.4 V. |
+| **LED** | AL8860 | 6× Cree C503B (1S6P) | 0–180 mA at ~3.2 V | Driven from V_INPUT (operates down to 4.5 V). |
 
-### Power budget (12 V input side)
+---
 
-| Block | Average | Peak |
-|---|---|---|
-| ESP32-S3 + logic (3.3D via buck, η ≈ 88 %) | 0.47 W | 1.9 W (WiFi burst) |
-| Sensors + GPS (3.3D) | 0.13 W | — |
-| AFE + ADC (3.3VA via 5 V: LDO burns 34 %) | 0.31 W | — |
-| TX drivers + boost (per-driver wake, F2 fix) | 0.10–0.15 W | 0.4 W during burst |
-| LED at calibrated dim (~40 % of 180 mA) | 0.28 W | 0.66 W full |
-| **Total** | **≈ 1.4 W (117 mA @ 12 V)** | ≈ 3 W momentary |
+### Power budget (V_INPUT side)
 
-Within the 2–3 W envelope with real margin now that F2 (driver sleep) and
-F3 (LED sizing) are fixed. Day mode (light off): ≈ 1.1 W.
+| Block | Average (at 5 V) | Average (at 12 V) | Average (at 19 V) | Notes |
+|---|---|---|---|---|
+| ESP32-S3 + Sensors (3.3D buck) | 0.50 W (100 mA) | 0.45 W (38 mA) | 0.45 W (24 mA) | High-efficiency buck. |
+| AFE + PCM1808 (3.3VA LDO) | 0.06 W (12 mA) | 0.15 W (12 mA) | 0.23 W (12 mA) | LDO drops excess voltage as heat. |
+| TX driver (direct drive) | 0.02 W (4 mA) | 0.05 W (4 mA) | 0.08 W (4 mA) | Transducer energy scales with voltage. |
+| LED at calibrated dim (~40%) | 0.28 W (56 mA) | 0.28 W (23 mA) | 0.28 W (15 mA) | AL8860 buck conversion. |
+| **Total** | **0.86 W (172 mA)** | **0.93 W (78 mA)** | **1.04 W (55 mA)** | System stays cool under all conditions. |
 
-## PD fallback behavior (bank without 12 V profile)
+---
 
-CH224K falls back 12 → 9 → 5 V. Design consequence check, per rail:
+## LED light (calibrated legal target)
 
-- **5 V buck at 5 V in:** AP63205 goes to ~100 % duty, output ≈ 4.6 V;
-  TPS7A20 still makes clean 3.3VA; TPS61170 still boosts to full Vb. ✔
-- **3.3D buck:** fine from 5 V. ✔
-- **LED:** this is why the ring is **1S** — a single 3.1 V string keeps
-  regulating from a 5 V input. 2S/3S would go dark. ✔
-- Firmware reads Vin (divider 100 k/10 k → an ESP32 ADC-capable spare TP…
-  GPIO0 is strapping-tolerant as input-only after boot; decide at capture —
-  optional, nice for telemetry only).
+*   **LEDs:** 6× Cree C503B high-brightness 5 mm through-hole white LEDs with integrated optics.
+*   **Topology:** 1S6P, 10 Ω ballast per LED.
+*   **Driver:** AL8860 buck, Rsense 0.56 Ω → 180 mA full scale.
+*   **Dimming:** PWM on DIM pin (GPIO42), **≥ 1 kHz** so the magnetometer rejects the ripple field.
+*   **Calibration:** Lux meter at 3 m in dark: ≥ 0.35 lx ⇒ ≥ 3 cd.
+*   **Default:** ON at power-up; dim only after calibration.
 
-## LED light (legal item resolved — see design-review F3)
-
-Requirement: BSO white all-round *gewöhnliches Licht*, visibility ≈ 2 km →
-≈ 1.0 cd minimum (Allard, 2·10⁻⁷ lx threshold). Target **≥ 3 cd over
-±25° vertical** for heel + aging margin.
-
-| Item | Value |
-|---|---|
-| LEDs | 6× mid-power white (0.2 W class, ~120 lm/W), equally spaced ring |
-| Topology | 1S6P, 1 Ω ballast per LED (matching between parallel LEDs) |
-| Driver | AL8860 buck, Rsense 0.56 Ω → 180 mA full scale |
-| Dimming | PWM on DIM pin (GPIO42), **≥ 1 kHz** so the magnetometer's filtering rejects the ripple field |
-| Calibration | lux meter at 3 m in dark: ≥ 0.35 lx ⇒ ≥ 3 cd; store duty in NVS |
-| Default | ON at full at power-up (works without Pi); dim only after calibration |
-
-Full-scale 0.6 W is ~5× the legal need — margin for diffuser losses being
-worse than the 70 % estimate, and a "harbor bright" mode.
-
-## Power-bank keepalive
-
-Steady night draw (~1.4 W) is above typical bank auto-off thresholds
-(~1–1.5 W); the risk case is **daytime** (light off, ~1.1 W) with a picky
-bank. Firmware keepalive, armed by config: every 8 s, 100 ms LED pulse at
-full current (invisible in daylight, +9 mW average) — reuses hardware, no
-dummy-load resistor. Verify against the actual bank; if its threshold is
-above ~2 W sustained, no firmware trick helps and the bank gets replaced
-(note in the manual/README of the build).
+---
 
 ## Sequencing and safe state
 
-- All converters enabled at power-up (EN tied); no sequencing requirements
-  among bucks. 3.3VA lags 3.3D slightly (extra LDO) — this is the cross-rail
-  verify item in the review (§4.1): confirm TMUX1108/MCP6S91/AD9235 logic
-  inputs tolerate V_logic > V_supply during the ~ms ramp.
-- Boot safe state is owned by the SR /OE pullup + per-net pulldowns
-  (afe-design.md): boost EN low, drivers asleep, mux disabled. Light defaults
-  ON via firmware as early as possible (it is the legally required function).
-- Brownout: ESP32-S3 internal BOD active; bulk cap rides through PD
-  renegotiation glitches ~ms class. Longer dropouts = clean reboot, light
-  restores at boot (~1 s gap, acceptable).
+*   **Cross-Rail Safety:** The LDO ($3.3VA$) rises slightly slower than the buck ($3.3D$). However, because the ESP32-S3 startup sequence and bootloader execution take ~50-100 ms before GPIOs are driven, all power rails are fully stable before any active digital pins are enabled.
+*   **Safe State at Boot:** The ESP32-S3 GPIO pins start in high-impedance mode at power-up. We place **100 kΩ pulldown resistors** directly on the `MUX_EN` and `TX_SEL0-3` lines. This ensures the RX mux is shut down and the DG412 switches are open (Hi-Z) by default at boot.
+*   **Brownout:** ESP32-S3 internal BOD active. Input bulk cap rides through short glitches.
 
-## Grounding / layout notes (for the layout phase)
+---
 
-- One solid ground plane; *partition by placement*, not splits: AFE strip on
-  one board edge (transducer connectors → mux → amps → ADC → ESP32 DVP pins),
-  switchers and LED driver on the opposite edge, radio antenna edge free of
-  copper per module datasheet.
-- TPS61170 and the two AP6320x get tight hot loops; SS16/SS34 close in.
-- LED feed/return routed as a tight pair (magnetometer, review §5).
-- 3.3VA star from the LDO; VMID buffer local to the AFE strip.
-- Kelvin at AL8860 Rsense and IPROPI resistors.
+## Grounding / layout notes
+
+- **Single Solid Ground Plane:** No splits. Partition by placement: analog AFE strip on one board edge (transducer connectors → mux → amps → PCM1808 ADC), power switchers and LED driver on the opposite edge.
+- **Switching loops:** AP63203 and AL8860 switching nodes kept as short as possible; diodes placed directly adjacent.
+- **LED feed/return:** Routed as a tight parallel pair to minimize magnetic field coupling to the magnetometer.
+- **Kelvin Connections:** Kelvin sense routing at AL8860 Rsense.

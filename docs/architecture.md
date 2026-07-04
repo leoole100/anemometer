@@ -1,94 +1,81 @@
-# System architecture
+# Architecture overview — updated 2026-07-04
 
-## Overview
+High-level signal flow, power rails, mechanical boundaries, and de-risking strategy for the **Balanced Masthead Wind Station (No GPS)**.
 
 ```
-                       MASTHEAD UNIT
-  ┌─────────────────────────────────────────────────┐
-  │  4x sealed 40 kHz transducers (down-facing)     │
-  │        ↕ burst / echo                           │
-  │  Analog front end                               │
-  │   TX: boost (10–30 V, fw-adjustable) + H-bridge │
-  │   RX: mux → clamp → fixed gain → PGA → AA → ADC │
-  │        ↓ parallel DVP capture (4 MSPS, DMA)     │
-  │  ESP32-S3  ── I2C ──  IMU + compass, SHT41      │
-  │   correlation,     ── UART ── GPS (optional)    │
-  │   Signal K deltas  ── PWM ──  all-round LED     │
-  │        ↓ WiFi (UDP)            ↑ 12 V           │
-  └────────┼───────────────────────┼────────────────┘
-           ↓                       │ 2-wire up the mast
-  ┌─────────────────────────────────────────────────┐
-  │  Raspberry Pi        USB-C bank → PD trigger    │
-  │  (Signal K server)   (requests 12 V)      DECK  │
-  └─────────────────────────────────────────────────┘
+                  WIND (40 kHz pulses)
+                           │
+                           ▼
+              ┌─────────────────────────┐
+              │    Waterproof Transducers│
+              └────────────┬────────────┘
+                           │
+       TX: 12 Vpp pulses   │   RX: echo (~10 mV)
+      (IXDF602 → DG412)    │   (74HC4051 → TLV9062 → PCM1808)
+                           ▼
+              ┌─────────────────────────┐
+              │   Analog Front End      │
+              └────────────┬────────────┘
+                           │ I2S (96 kSPS, DMA)
+                           ▼
+              ┌─────────────────────────┐
+              │      ESP32-S3           │
+              │  (Motion & Heading Comp)│
+              └───────┬─────────┬───────┘
+                      │ I2C     │ WiFi (Signal K / NMEA)
+                      ▼         ▼
+             IMU / Mag Sensors  Boat Network (Cabin GPS / Display)
 ```
 
-## Decisions and rationale
+---
 
-### Single MCU: ESP32-S3
+## Core System Architecture
 
-Chosen over a two-MCU split (STM32G4 measurement + ESP32 comms). The split wins
-when iterating hardware at a bench; with the direct-to-PCB strategy all
-iteration is firmware, and a single OTA-updatable target beats two codebases,
-an inter-MCU protocol designed blind, and SWD access at the masthead.
+The anemometer is split into a **Masthead Unit (Top Unit)** and a **Cabin/Deck Network (Bottom Unit)** to optimize cost, reliability, and installation complexity:
 
-Consequences:
-- Analog front end is external catalog parts (PGA + SPI ADC) instead of the
-  G4's internal op-amps. Fully predictable on paper, fixed at layout — hence
-  wide adjustment ranges everywhere.
-- Capture start is software-triggered (µs jitter from WiFi/RTOS). Neutralized
-  by the **TX marker**: an attenuated copy of the TX burst is summed into the
-  RX path, so t=0 and the echo are in the same capture buffer on the same
-  clock. Trigger jitter cancels exactly.
+1.  **Masthead Unit (Top Unit):**
+    *   Dedicated purely to ultrasonic time-of-flight wind speed and direction tracking.
+    *   Includes an **IMU (ISM330DHCX)** for active mast-motion compensation and a **Magnetometer (MMC5983MA)** for automatic heading orientation.
+    *   Does **not** contain a GPS module (the GPS receiver is located in the cabin/deck network where satellite lock is easier to maintain and cabling/servicing is simple).
+    *   Communicates wirelessly over WiFi (Signal K / NMEA raw UDP pings) to the boat's server.
+    *   Encased in a simple 3D-printed enclosure and waterproofed directly by **brushing structural epoxy** over the electronics, eliminating the need for expensive watertight gaskets.
+2.  **Cabin Unit / Boat Network (Bottom Unit):**
+    *   Handles navigation displays, GPS coordinate tracking, and Signal K data multiplexing.
 
-### Time-of-flight by waveform correlation
+---
 
-Full received waveform sampled at 4 MSPS (processed at 2 MSPS after the
-baseband mix), cross-correlated in firmware.
-Envelope for the coarse peak (cycle-slip protection), carrier
-phase/interpolation for fine timing. Reciprocal (up/down) measurement makes
-wind independent of sound speed; the ToF **sum** yields sound speed →
-air temperature for free (cross-checked against SHT41).
+## Masthead Unit Power Structure
 
-### Sensors
+Power is supplied directly from the boat's $12\text{ V}$ house network via a simple 2-wire cable up the mast (no deck-side USB-C PD trigger box required).
 
-- SHT41: outside temperature + humidity. Mount with airflow exposure and sun
-  shading, away from self-heating parts (ESP32 radio).
-- IMU + magnetometer: attitude (mast motion compensation) and heading.
-- GPS: optional, u-blox M10 class, UART.
+*   **12 V Input:** Fed directly to the **IXDF602** gate driver and the **DG412** switch selector. This drives the active transducer with a strong **$12\text{ Vpp}$** square wave, completely eliminating the need for a high-voltage boost converter.
+*   **3.3 V Digital buck (3.3D):** Generated by an **AP63203** buck regulator from the $12\text{ V}$ input. Powers the ESP32-S3, the SMT sensors (IMU, Magnetometer), and the digital core of the ADC.
+*   **3.3 V Analog LDO (3.3VA):** Generated by a low-cost, high-voltage **HT7333-A** LDO regulator directly from the $12\text{ V}$ input to power the sensitive analog op-amps and the ADC's analog domain.
+*   **LED Light Ring Buck:** An **AL8860** buck driver regulates $180\text{ mA}$ to a 1S6P parallel string of 6 Cree C503B LEDs (powered from the $12\text{ V}$ input).
 
-### Power
+---
 
-- PD trigger (CH224K-class) at mast base requests 12 V from the USB-C bank.
-- Thin 2-wire cable up the mast (~250 mA at 12 V, total budget 2–3 W).
-- At masthead: bucks to 5 V / 3.3 V, boost 10–30 V (firmware-set) for TX.
-- Power-bank auto-shutoff risk: if the bank sleeps under light load, firmware
-  emits periodic ~100 ms load pulses. Test with the actual bank.
+## Masthead Unit Signal Chain
 
-### Data
+### Transmit (TX)
+*   The ESP32-S3's LEDC peripheral generates a 40 kHz square wave on `PWM_A`.
+*   The **IXDF602** dual gate driver buffers this signal, shifting it to a $12\text{ Vpp}$ output rail.
+*   A **DG412** quad SPST switch selects the active transmitting transducer (`TX_SEL0-3` controlled directly by ESP32 GPIOs).
+*   During transmission, the inactive channels are held Hi-Z by opening their respective DG412 switches ($C_{off} \approx 5\text{ pF}$, $R_{off} \approx \text{Gigaohms}$).
 
-- Signal K delta JSON over UDP at 5–10 Hz to the Pi (stock UDP connection).
-- Paths: environment.wind.speedApparent / angleApparent,
-  environment.outside.temperature / humidity / pressure(if added),
-  navigation.attitude, navigation.headingMagnetic, navigation.position.
-- Light exposed as a Signal K switch path; defaults ON at power-up so it works
-  without the Pi.
-- Debug pipe is first-class firmware, written first: raw ADC capture buffers
-  streamed over WiFi to a laptop (Python analysis), WiFi log console, OTA.
+### Receive (RX)
+*   The small acoustic echo received by the transducer is routed via a $10\text{ k}\Omega$ resistor and a BAV99 clamp diode (to protect the inputs) to a **74HC4051** 8-channel analog multiplexer.
+*   The active channel's signal is routed through the multiplexer to a **single TLV9062** dual op-amp chip:
+    *   **Stage 1 (A1):** Fixed-gain bandpass amplifier providing $+40\text{ dB}$ (G=100) gain.
+    *   **Stage 2 (A2):** $48\text{ kHz}$ Sallen-Key low-pass filter to act as an anti-aliasing filter.
+*   The filtered signal is AC-coupled to a **PCM1808** stereo I2S ADC.
+*   The PCM1808 samples the waveform continuously at **$96\text{ kSPS}$** (2.4 samples per carrier cycle) and streams the 24-bit data directly into the ESP32-S3's RAM using standard I2S DMA.
 
-## De-risking rules for the one-spin board
+---
 
-1. 50 dB of total gain authority (20–70 dB), digitally set (transducer
-   sensitivity is the biggest unknown).
-2. TX drive voltage firmware-adjustable 10–30 V.
-3. 0-ohm links between every analog stage; test points on every node.
-4. Stuffing options for filter RCs; transducers bought from two vendors.
-5. Transducers mounted in rubber grommets (structural crosstalk is the classic
-   failure and can't be computed in advance); TX marker lets firmware window
-   out residual crosstalk.
-6. Acoustic geometry lives in the 3D-printed enclosure, not the PCB —
-   geometry iterations are free.
-7. Order 5 PCBs (min qty) + stencil, hand-assemble one unit stage by stage
-   over the isolation links (revised 2026-07-04, see bom.md); firmware
-   development starts against simulated capture buffers while parts are in
-   the mail.
+## De-risking Rules
+
+1.  **Direct SMT Mounting:** The IMU and Magnetometer are soldered directly to the main PCB to save cost and space.
+2.  **Thermal Peninsula:** The SHT41 temperature sensor is completely omitted to avoid self-heating issues.
+3.  **Brush-On Waterproofing:** Brush structural epoxy over the electronics (using Kapton tape to mask the sensor ports of the IMU and Magnetometer, and the ESP32 WiFi antenna). This eliminates the cost and complexity of watertight enclosure seals.
+4.  **No PGA / Fixed Gain:** A fixed gain of $+40\text{ dB}$ combined with the 24-bit ADC's high dynamic range ($>98\text{ dB}$ SNR) simplifies the AFE, eliminating the PGA and gain switches.
