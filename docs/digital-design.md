@@ -13,16 +13,22 @@ and afe-design.md (control shift registers).
 | GPIO0 | 10 k pullup footprint (DNP), test pad on the program header (boot strap) |
 | Antenna | module keepout per datasheet: no copper any layer under antenna, module overhangs board edge; enclosure is printed plastic — fine at masthead |
 
-**Programming/debug:** two headers, both reachable with the enclosure open:
+**Programming/debug** (decision 2026-07-04: real USB-C receptacle; the
+enclosure stays screwed during development and is glued shut for the final
+seal — see enclosure-design.md):
 
-1. **USB header** (GPIO19/20 + 5 V + GND, 4-pin JST-SH): native USB-Serial-JTAG
-   — flashing, console, JTAG, all through one connector. Primary bench access.
-   A USB-C receptacle is *not* placed — this is a sealed masthead unit; bench
-   access happens with the board out.
-2. **UART0 header** (43/44 + EN + GPIO0 + GND): ROM-loader fallback if
-   firmware wedges native USB.
+1. **USB-C receptacle** (16-pin USB2-only type, e.g. TYPE-C-31-M-12):
+   GPIO19/20 → native USB-Serial-JTAG — flashing, console, JTAG through one
+   cable. CC1/CC2 5.1 k pulldowns (UFP), USBLC6-2SC6 ESD array on D±.
+   **Bench power for free:** VBUS → SS34 → the protected input node, so the
+   board runs from the laptop alone — electrically identical to the PD 5 V
+   fallback case (everything works, light at reduced headroom). Backfeed
+   into a connected mast cable is blocked by the input-side SS34.
+2. **UART0 pads** (43/44 + EN + GPIO0 + GND): ROM-loader fallback if
+   firmware wedges native USB. Pads only, no connector.
 
-Day-one OTA (README strategy) makes both of these last-resort paths.
+Day-one OTA (README strategy) makes both of these last-resort paths once
+the enclosure is glued.
 
 ## Strapping pins — explicit treatment
 
@@ -110,7 +116,7 @@ enclosure-phase item (pinmap open list). All parts DNP-able as a group.
 
 | Item | Part | Notes |
 |---|---|---|
-| Program headers | JST-SH 4-pin (USB), 1×6 2.54 mm (UART0/EN/IO0) | |
+| USB | USB-C 16-pin receptacle + USBLC6-2SC6 + 2× 5.1 k CC pulldowns + SS34 VBUS OR-diode | UART0/EN/IO0 as pads only |
 | I2C pullups | 4.7 k ×2 | |
 | EN RC | 10 k + 1 µF | |
 | Vin telemetry divider (optional) | 100 k / 10 k + 100 nF → GPIO0 | DNP by default; GPIO0 input-safe after boot |

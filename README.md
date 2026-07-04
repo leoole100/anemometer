@@ -25,6 +25,7 @@ ranges, adjustable TX drive, stage-isolation links, test points, OTA from day on
 - [docs/pinmap-parts.md](docs/pinmap-parts.md) — GPIO map and part selection
 - [docs/enclosure-design.md](docs/enclosure-design.md) — acoustic geometry in plastic, environment, GPS/LED placement
 - [docs/design-review-2026-07-04.md](docs/design-review-2026-07-04.md) — full-numbers design review, findings F1–F4
+- [docs/bom.md](docs/bom.md) — refdes-level part selection and cost (~€612 all-in, 5 assembled boards)
 
 ## Status (July 2026)
 

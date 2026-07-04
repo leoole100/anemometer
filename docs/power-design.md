@@ -33,6 +33,7 @@ feeding the AFE.
 | Reverse polarity | SS34 series Schottky | 0.3 V · 0.2 A ≈ 60 mW loss — accepted for simplicity; PFET footprint not worth it at this current |
 | Surge/ESD | SMAJ15A TVS (15 V standoff, clamps ~24 V) | all downstream parts ≥ 32 V rated |
 | Bulk | 100 µF electrolytic + 10 µF X7R | cable inductance + PD hot-plug |
+| USB bench feed | SS34 from USB-C VBUS into the node after the input SS34 | board runs from the laptop alone ≙ the 5 V PD fallback case; diodes isolate the two sources |
 
 Cable: 2×0.5 mm² (AWG20) ≈ 0.46 Ω for 14 m loop → 0.1 V drop at peak load.
 Even AWG24 (1.2 Ω, 0.3 V) works; specify 0.5 mm² for abrasion margin, not

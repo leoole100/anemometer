@@ -25,8 +25,12 @@ f0 = 40 ± 1 kHz. Check on the candidate datasheets:
 Selected candidates (July 2026 research):
 
 - **Primary: Multicomp MCUSD16A40S12RO** (Farnell 2362677) — sealed 16 mm
-  metal-can transceiver, 40 kHz, −65 dB sensitivity, −30…+85 °C. European
-  distribution, real datasheet.
+  metal-can transceiver, 40 kHz, −30…+85 °C. European distribution, real
+  datasheet. Sensitivity per the Farnell listing is **−74 dB** re 1 V/Pa
+  (not −65 dB as first researched; noted 2026-07-04, bom.md): echo then
+  ≈ 1.3 mV worst case → 50 dB gain needed (authority 70.3 dB ✔), SNR
+  ≈ 41 dB (timing budget assumed 25–35 dB ✔). The wide gain range absorbs
+  it — this is exactly what it was provisioned for.
 - **Second vendor: TCT40-16 sealed / Taidacent 16 mm waterproof transceiver**
   (generic parking-sensor class, ≥106–117 dB SPL @ 10 V/30 cm across vendors —
   consistent with the 105 dB link-budget assumption).

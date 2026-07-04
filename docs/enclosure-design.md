@@ -76,8 +76,13 @@ sits on the far end of the main PCB (review §5).
 - **SHT41 exposure:** double-walled side labyrinth into the electronics bay
   wall — outside air reaches the stub with no line of sight for sun or
   spray; stub thermally slotted from the main PCB (digital-design.md).
-- **Sealing:** one O-ring (diffuser dome to body) + one gasket (bay lid);
-  stainless A4 screws into heat-set brass inserts.
+- **Sealing (two-stage, decision 2026-07-04):** during development the
+  joints run on O-ring/gasket + A4 screws into heat-set inserts, opened as
+  often as needed (USB-C on the main PCB is reachable with the bay lid off).
+  Once the unit is calibrated and proven on the water, the joints are
+  **glued shut** (PU adhesive or epoxy; solvent-free — ASA crazes) for the
+  permanent seal. After gluing, all access is OTA + WiFi debug pipe; the
+  Gore vent stays, a glued box still has to breathe.
 - **Cable entry:** M8 gland at the mast socket, drip loop inside the mast.
 - **Mast mount:** printed socket sleeve for the dinghy's mast-top fitting
   with a positive rotational index (device X-axis = boat forward within a
