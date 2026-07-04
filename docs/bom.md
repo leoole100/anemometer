@@ -1,12 +1,38 @@
-# BOM and cost — 2026-07-04
+# BOM and cost — 2026-07-04 (rev. self-assembly)
 
 Refdes-level part selection for everything, with cost. Prices are unit
-prices at the quantities actually bought (≈ qty 5–10), mid-2026, EUR,
-estimates ±30 % — spot-checked against distributor listings for the
-big-ticket items (AD9235, transducers, GPS, magnetometer). Sourcing
-strategy: **JLCPCB 4-layer, 5 boards, economic SMT assembly**, parts from
-LCSC where stocked; Mouser/Farnell for the rest (hand-solder — everything
-hand-placeable is SOIC/TSSOP or wired).
+prices at the quantities actually bought, mid-2026, EUR, estimates ±30 % —
+spot-checked against distributor listings for the big-ticket items
+(AD9235, transducers, GPS, magnetometer).
+
+**Build plan (revised):** single unit, hand-assembled by the builder.
+PCBs ordered unassembled (JLCPCB 4-layer, min qty 5, **stencil included in
+the order**); one board populated, the other four are rework/rebuild stock.
+
+## Hand-assembly package audit — no BGA anywhere
+
+Nothing on the board is BGA. Packages fall into three classes:
+
+| Class | Parts | Method |
+|---|---|---|
+| Iron-friendly (leaded) | AD9235 (TSSOP-28), TMUX1108, 74AHC595/08 (TSSOP), MCP6S91, OPA2365 (SOIC-8), AP63205/03, TPS7A20, AL8860, USBLC6, TMUX1101 (SOT/TSOT/SC70), all diodes, USB-C receptacle, R/C field | plain iron |
+| Leaded + exposed pad | DRV8876 **PWP** (HTSSOP-16), ESP32-S3-WROOM (castellated + center pad) | iron for the pins; pad soldered through a back-side via window, or hot air. DRV8876 pad is thermal/GND and thermally uncritical here (mA-class average) |
+| Leadless — **needs reflow, not iron** | ISM330DHCX (LGA-14), MMC5983MA (LGA-16), SHT41 (DFN-4), TPS61170 (WSON-6), SAM-M10Q (LGA) | stencil + solder paste + hotplate or hot-air station; all pads are at the package edge → inspectable and hot-air-reworkable |
+
+**Recommended path:** paste + stencil + a cheap hotplate/hot-air station
+(~€40 one-time if not owned) for the leadless minority — this keeps the
+design exactly as reviewed, and is the normal one-off workflow. LGA MEMS
+sensors fundamentally cannot be ironed; the alternative would be breakout
+daughterboards (SparkFun 9DoF ≈ €28 + SHT41 breakout ≈ €7), which costs
+more than the hot-air station and complicates the enclosure.
+
+**Iron-only fallbacks, documented in case reflow is off the table:**
+- TPS61170 (WSON) → **LMR64010** (SOT-23-5, 40 V / 1 A / 1.6 MHz,
+  FB ref 1.23 V — the existing 120 k / 6.8 k / 18 k injection network works
+  unchanged). Caveat: max duty ~88 % ⇒ on USB bench power (4.6 V rail) the
+  top of the Vb range sags to ~25 V; on mast power full 30 V is reachable.
+- Sensors → breakout daughterboards as above.
+- SAM-M10Q → hot air only, or omit (it's a stuff option).
 
 ## A. Main board — semiconductors
 
@@ -34,12 +60,12 @@ hand-placeable is SOIC/TSSOP or wired).
 | **Subtotal** | | | | | **57.41** | |
 
 **AD9235 cost note:** the -20 grade is ~$34 at LCSC / ~€25–30 at
-Mouser-class distributors — it is **~30 % of the board's semiconductor
-cost**. Plan: populate the ADC on **3 of the 5 boards** (one flying unit,
-one hot spare, one bench mule; the two bare boards are for AFE rework
-experiments) → saves €60. The cheap-ADC fallback (AD9226 Chinese module,
-different footprint) stays a documented plan B only if all five boards are
-ever needed alive at once.
+Mouser-class distributors — the single most expensive component by far.
+Plan for the self-assembled single unit: **buy 2** (one fitted, one spare
+against a soldering accident — TSSOP-28 is forgiving, but this is the one
+part where a lost pin costs €30 and a re-order delay). The cheap-ADC
+fallback (AD9226 Chinese module, different footprint) stays a documented
+plan B only.
 
 ## B. Main board — sensors
 
@@ -92,14 +118,15 @@ research. Echo then ≈ 1.3 mV worst case → 50 dB gain needed (authority
 70.3 dB ✔), SNR ≈ 41 dB (budget assumed 25–35 ✔). No change needed — this
 is exactly what the wide gain range was provisioned for.
 
-## F. PCB + assembly (JLCPCB, 5 boards)
+## F. PCB + consumables (self-assembly)
 
 | Item | € | Notes |
 |---|---|---|
-| PCB 4-layer ~100 × 70 mm, 5 pcs | 30 | ENIG not needed |
-| SMT assembly, 5 boards, one side | 140 | setup + feeders + ~40 extended-part fees dominate |
-| SMT parts, 5 board-sets (§A–C less GPS), ADC on 3 | 340 | 5 × €67.4 + 3 × €30 |
-| **Subtotal** | **510** | all five boards live except 2 without ADC |
+| PCB 4-layer ~100 × 70 mm, 5 pcs (min qty) | 30 | ENIG not needed; boards 2–5 are rebuild stock |
+| Stencil (frameless) | 8 | ordered with the PCBs |
+| Solder paste + flux + wick | 10 | consumables |
+| Hotplate or hot-air station | (40) | one-time tool, only if not owned |
+| **Subtotal** | **48** | (+40 tool) |
 
 ## G. Deck side
 
@@ -124,30 +151,46 @@ is exactly what the wide gain range was provisioned for.
 | Adhesive for final seal (PU/epoxy) | 3.00 | see enclosure-design.md |
 | **Subtotal** | **24.30** | |
 
-## Cost rollup
+## Cost rollup (single self-assembled unit)
 
 | | € |
 |---|---|
-| F — PCB + assembly + SMT parts, 5 boards (3 with ADC) | 510 |
-| D×1 + E-fitted — connectors + 4 transducers on the flying unit | 18 |
-| B-opt — GPS on the flying unit | 17 |
-| E-spares — transducer stock (6 + 4) | 30 |
+| One parts set, board-complete (§A–D incl. 4 fitted transducers) | 98 |
+| Spare AD9235 (see cost note) | 30 |
+| Spares kit: 1× each IC under €3, extra passives strip | 15 |
+| B-opt — GPS | 17 |
+| E-spares — transducer stock (6 primary + 4 alt vendor) | 30 |
+| F — PCB ×5 + stencil + consumables | 48 |
 | G — deck side | 13 |
 | H — enclosure hardware | 24 |
-| **Project all-in** | **≈ €612** |
-| — of which one *flying unit* BOM (board €97 + GPS €17 + mech €24 + deck €13 + print share) | ≈ €160 |
+| **Project all-in** | **≈ €275** |
+| Trimmed variant (no GPS, no spare ADC, transducer spares 2+2) | ≈ €205 |
+| (+ hotplate/hot-air station if not owned) | +40 |
 
-Sanity: the €510 board run is the price of the "no bench prototyping,
-5 assembled boards" strategy — the marginal cost of boards 2–5 (~€75 each
-without ADC) is the insurance premium against a dead one-spin. The single
-largest de-scoping lever if it ever matters is the AD9235 count; second is
-assembly fees (hand-assembling 2 of the 5 saves ~€40 but costs a weekend).
+Largest single line items, ranked: AD9235 €30 (€60 with the spare),
+transducer stock €44 total, PCB run €38, enclosure hardware €24, GPS €17,
+4× DRV8876 €9.2, ISM330DHCX €7.5, 2× OPA2365 €5.6 — everything else is
+under €4. The earlier €612 figure was **not** component cost: it was the
+5-assembled-boards strategy (€140 assembly service + ~€200 of parts
+multiplied across four boards that would mostly sit in a drawer). One set
+of electronics for this device is ≈ €100.
+
+**Strategy note (README updated):** hand assembly moves the first-failure
+risk from design to soldering. Mitigation is already in the design — the
+0-ohm stage-isolation links double as bring-up jumpers: power section
+first (no ICs downstream fitted), then digital, then AFE stage by stage,
+each verified at its test points before the next is placed. Boards 2–5
+plus the spares kit mean any botched stage is a rebuild, not a re-order.
 
 ## Ordering checklist
 
-1. LCSC/JLCPCB: everything in §A/C except noted + PCB + assembly.
-2. Mouser or DigiKey: AD9235BRUZ-20 ×3, OPA2365 (if LCSC dry), MCP6S91,
-   MMC5983MA, SAM-M10Q ×1, VENT-PS1NGY — one order, one shipping fee.
-3. Farnell: MCUSD16A40S12RO ×10 (2362677).
-4. AliExpress: TCT40-16 sealed ×4, CH224K module, grommets, glands.
-5. Local/hardware: Al disc, fasteners, cable.
+1. JLCPCB: PCB ×5 + stencil.
+2. LCSC: §A/C jellybeans (AHC logic, AP6320x, diodes, R/C reels, LEDs,
+   TMUX1101, USB-C, inductors).
+3. Mouser or DigiKey: AD9235BRUZ-20 ×2, DRV8876 ×5, OPA2365 ×3, MCP6S91 ×2,
+   TMUX1108 ×2, TPS61170 ×2, TPS7A20, AL8860, ISM330DHCX, MMC5983MA, SHT41
+   (×2 — it's near connectors during gluing), SAM-M10Q ×1, VENT-PS1NGY —
+   one order, one shipping fee.
+4. Farnell: MCUSD16A40S12RO ×10 (2362677).
+5. AliExpress: TCT40-16 sealed ×4, CH224K module, grommets, glands.
+6. Local/hardware: Al disc, fasteners, cable, paste if not ordered above.

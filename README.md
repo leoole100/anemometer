@@ -15,6 +15,12 @@ directly and iteration happens in firmware only — no bench prototyping stage.
 Boards are therefore designed for rescue-by-firmware: wide digitally-set gain
 ranges, adjustable TX drive, stage-isolation links, test points, OTA from day one.
 
+Assembly (decided 2026-07-04): **hand-assembled by the builder**, single
+unit; PCBs ordered unassembled (min qty 5, spares are rebuild stock),
+stencil + hotplate reflow for the leadless minority, iron for the rest.
+No BGA parts anywhere (audit in docs/bom.md). The stage-isolation links
+double as bring-up jumpers: power → digital → AFE, verified stage by stage.
+
 ## Documents
 
 - [docs/architecture.md](docs/architecture.md) — system architecture and rationale
@@ -25,7 +31,7 @@ ranges, adjustable TX drive, stage-isolation links, test points, OTA from day on
 - [docs/pinmap-parts.md](docs/pinmap-parts.md) — GPIO map and part selection
 - [docs/enclosure-design.md](docs/enclosure-design.md) — acoustic geometry in plastic, environment, GPS/LED placement
 - [docs/design-review-2026-07-04.md](docs/design-review-2026-07-04.md) — full-numbers design review, findings F1–F4
-- [docs/bom.md](docs/bom.md) — refdes-level part selection and cost (~€612 all-in, 5 assembled boards)
+- [docs/bom.md](docs/bom.md) — refdes-level part selection, package audit, cost (~€275 all-in, self-assembled)
 
 ## Status (July 2026)
 

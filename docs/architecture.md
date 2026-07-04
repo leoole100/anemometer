@@ -88,5 +88,7 @@ air temperature for free (cross-checked against SHT41).
    out residual crosstalk.
 6. Acoustic geometry lives in the 3D-printed enclosure, not the PCB —
    geometry iterations are free.
-7. Order 5 boards assembled; firmware development starts against simulated
-   capture buffers while boards are in production.
+7. Order 5 PCBs (min qty) + stencil, hand-assemble one unit stage by stage
+   over the isolation links (revised 2026-07-04, see bom.md); firmware
+   development starts against simulated capture buffers while parts are in
+   the mail.
